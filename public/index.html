@@ -19,7 +19,7 @@
     }
 
     .container {
-      max-width: 1200px;
+      max-width: 1700px;
       margin: 0 auto;
       padding: 20px;
     }
@@ -345,6 +345,47 @@
       margin-top: 15px;
     }
 
+    .download-bar {
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      background: white;
+      border-radius: 12px;
+      padding: 16px 24px;
+      margin-bottom: 20px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+    }
+
+    .download-bar .edit-count {
+      font-size: 0.95rem;
+      color: #555;
+    }
+
+    .download-bar .edit-count strong {
+      color: #667eea;
+    }
+
+    .btn-download {
+      background: linear-gradient(135deg, #43a047 0%, #2e7d32 100%);
+      color: white;
+      border: none;
+      padding: 10px 24px;
+      border-radius: 8px;
+      font-size: 1rem;
+      cursor: pointer;
+      font-weight: 600;
+      transition: opacity 0.2s;
+    }
+
+    .btn-download:hover {
+      opacity: 0.9;
+    }
+
+    .btn-download:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
     .error-message {
       background: #ffebee;
       color: #c62828;
@@ -434,6 +475,10 @@
         <h2 id="presentation-title">Converted Slides</h2>
         <span class="slide-count" id="slide-count">0 slides</span>
       </div>
+      <div class="download-bar" id="download-bar">
+        <span class="edit-count" id="edit-count-label"><strong>0</strong> text edits pending</span>
+        <button class="btn-download" id="download-btn" onclick="downloadPptx()">Download Edited PPTX</button>
+      </div>
       <div class="slides-wrapper" id="slides-wrapper">
         <!-- Slides will be inserted here -->
       </div>
@@ -491,6 +536,8 @@
     let currentElement = null;
     let selectedStyle = null;
     let previewedText = null;
+    let currentPresentationId = null;
+    let pendingEdits = new Map(); // elementId -> { slideIndex, elementId, newText }
 
     // DOM Elements
     const uploadZone = document.getElementById('upload-zone');
@@ -572,6 +619,9 @@
           throw new Error(data.error || 'Upload failed');
         }
 
+        currentPresentationId = data.presentationId;
+        pendingEdits.clear();
+        updateDownloadBar();
         displaySlides(data.html, data.slideCount, file.name);
       } catch (error) {
         showError(error.message);
@@ -679,7 +729,71 @@
       if (currentElement && previewedText) {
         currentElement.innerHTML = previewedText.replace(/\n/g, '<br>');
         currentElement.dataset.originalText = previewedText;
+
+        // Track the edit
+        const elementId = currentElement.dataset.elementId;
+        const slideEl = currentElement.closest('.slide');
+        const slideIndex = slideEl ? parseInt(slideEl.dataset.slideIndex) : 0;
+        const shapeIdxStr = currentElement.dataset.shapeIdx;
+        const shapeIdx = shapeIdxStr !== "" ? parseInt(shapeIdxStr) : undefined;
+        pendingEdits.set(elementId, {
+          slideIndex,
+          elementId,
+          shapeIdx,
+          newText: previewedText,
+        });
+        updateDownloadBar();
+
         closeEditMenu();
+      }
+    }
+
+    // Update download bar visibility and edit count
+    function updateDownloadBar() {
+      const bar = document.getElementById('download-bar');
+      const label = document.getElementById('edit-count-label');
+      if (pendingEdits.size > 0) {
+        bar.style.display = 'flex';
+        label.innerHTML = `<strong>${pendingEdits.size}</strong> text edit${pendingEdits.size !== 1 ? 's' : ''} pending`;
+      } else {
+        bar.style.display = 'none';
+      }
+    }
+
+    // Download the modified PPTX
+    async function downloadPptx() {
+      if (!currentPresentationId || pendingEdits.size === 0) return;
+
+      const btn = document.getElementById('download-btn');
+      btn.disabled = true;
+      btn.textContent = 'Generating...';
+
+      try {
+        const response = await fetch(`/api/download/${currentPresentationId}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ edits: Array.from(pendingEdits.values()) }),
+        });
+
+        if (!response.ok) {
+          const err = await response.json();
+          throw new Error(err.error || 'Download failed');
+        }
+
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = response.headers.get('Content-Disposition')?.match(/filename="(.+)"/)?.[1] || 'edited.pptx';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      } catch (error) {
+        alert('Download failed: ' + error.message);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Download Edited PPTX';
       }
     }
 
