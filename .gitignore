@@ -27,3 +27,10 @@ uploads/
 # Build output
 dist/
 build/
+
+# Obsidian (keep app.json, ignore workspace state)
+.obsidian/workspace.json
+.obsidian/workspace-mobile.json
+.obsidian/plugins/
+.obsidian/community-plugins.json
+.obsidian/hotkeys.json
