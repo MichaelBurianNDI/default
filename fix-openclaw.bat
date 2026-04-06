@@ -40,13 +40,25 @@ echo Configuring gateway mode...
 call openclaw config set gateway.mode local
 echo [OK] Gateway mode set to local
 
-REM Step 5: Run doctor --fix to auto-repair remaining issues
+REM Step 5: Set agent model to a valid model
+echo.
+echo Configuring agent model...
+call openclaw config set agents.defaults.model "openai/gpt-5.4"
+echo [OK] Agent model set
+
+REM Step 6: Create memory workspace directory
+echo.
+echo Creating memory directory...
+if not exist "%USERPROFILE%\.openclaw\workspace\memory" mkdir "%USERPROFILE%\.openclaw\workspace\memory"
+echo [OK] Memory directory ready
+
+REM Step 7: Run doctor --fix to auto-repair remaining issues
 echo.
 echo Running doctor --fix...
 call openclaw doctor --fix
 echo.
 
-REM Step 6: Verify
+REM Step 8: Verify
 echo.
 echo ============================================
 echo   Verification
