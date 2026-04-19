@@ -27,3 +27,6 @@ uploads/
 # Build output
 dist/
 build/
+
+# Cloned third-party repos (reproduced by install scripts)
+external/
