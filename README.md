@@ -1,3 +1,0 @@
-# default
-
-Placeholder repository.
